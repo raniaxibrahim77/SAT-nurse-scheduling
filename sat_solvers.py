@@ -33,52 +33,71 @@ def dp_sat(cnf):
     return eliminate([set(c) for c in cnf])
 
 def dpll_sat(cnf):
-    cnf = [set(c) for c in cnf]
-    assignment = set()
-    while True:
-        units = [c for c in cnf if len(c) == 1]
-        if not units:
-            break
-        lit = next(iter(units[0]))
-        assignment.add(lit)
-        new_cnf = []
-        for c in cnf:
-            if lit in c:
-                continue
-            if -lit in c:
-                r = c - {-lit}
-                if not r:
-                    return False
-                new_cnf.append(r)
-            else:
-                new_cnf.append(c)
-        cnf = new_cnf
-    lits = set().union(*cnf) if cnf else set()
-    for lit in [l for l in lits if -l not in lits]:
-        assignment.add(lit)
-        cnf = [c for c in cnf if lit not in c]
-    if not cnf:
-        return True
-    if any(len(c) == 0 for c in cnf):
-        return False
-    var = abs(next(iter(next(iter(cnf)))))
-    if dpll_sat([list(c) for c in cnf if var not in c] +
-                [list(c - {-var}) for c in cnf if -var in c]):
-        return True
-    return dpll_sat([list(c) for c in cnf if -var not in c] +
-                    [list(c - {var}) for c in cnf if var in c])
-
-def cdcl_sat(cnf):
-    base = [set(c) for c in cnf]
-    learned = []
-    def solve(clauses):
-        assignment = []
+    def dpll(clauses, assignment):
         while True:
             units = [c for c in clauses if len(c) == 1]
             if not units:
                 break
             lit = next(iter(units[0]))
-            assignment.append(lit)
+            assignment.add(lit)
+            new_cnf = []
+            for c in clauses:
+                if lit in c:
+                    continue
+                if -lit in c:
+                    r = c - {-lit}
+                    if not r:
+                        return False
+                    new_cnf.append(r)
+                else:
+                    new_cnf.append(c)
+            clauses = new_cnf
+        if not clauses:
+            return True
+        if any(len(c) == 0 for c in clauses):
+            return False
+        var = abs(next(iter(next(iter(clauses)))))
+        for val in [var, -var]:
+            new_assignment = assignment.copy()
+            new_assignment.add(val)
+            new_cnf = []
+            for c in clauses:
+                if val in c:
+                    continue
+                if -val in c:
+                    r = c - {-val}
+                    if not r:
+                        break
+                    new_cnf.append(r)
+                else:
+                    new_cnf.append(c)
+            else:
+                if dpll(new_cnf, new_assignment):
+                    assignment.clear()
+                    assignment.update(new_assignment)
+                    return True
+        return False
+
+    clauses = [set(c) for c in cnf]
+    assignment = set()
+    sat = dpll(clauses, assignment)
+    if sat:
+        return True, sorted(assignment)
+    else:
+        return False, None
+
+def cdcl_sat(cnf):
+    base = [set(c) for c in cnf]
+    learned = []
+    model = set()
+
+    def solve(clauses, assignment):
+        while True:
+            units = [c for c in clauses if len(c) == 1]
+            if not units:
+                break
+            lit = next(iter(units[0]))
+            assignment.add(lit)
             new = []
             for c in clauses:
                 if lit in c:
@@ -97,17 +116,32 @@ def cdcl_sat(cnf):
             return False, next(c for c in clauses if len(c) == 0)
         var = abs(next(iter(next(iter(clauses)))))
         for lit in (var, -var):
-            sat, conflict = solve([c for c in clauses if lit not in c] +
-                                  [c - {-lit} for c in clauses if -lit in c])
-            if sat:
-                return True, None
-            if conflict is not None:
-                return False, conflict
+            new_assignment = assignment.copy()
+            new_assignment.add(lit)
+            new_clauses = []
+            for c in clauses:
+                if lit in c:
+                    continue
+                if -lit in c:
+                    r = c - {-lit}
+                    if not r:
+                        break
+                    new_clauses.append(r)
+                else:
+                    new_clauses.append(c)
+            else:
+                sat, conflict = solve(new_clauses, new_assignment)
+                if sat:
+                    assignment.clear()
+                    assignment.update(new_assignment)
+                    return True, None
         return False, None
+
     while True:
-        sat, conflict = solve(base + learned)
+        assignment = set()
+        sat, conflict = solve(base + learned, assignment)
         if sat:
-            return True
+            return True, sorted(assignment)
         if conflict is None:
-            return False
+            return False, None
         learned.append(conflict)
