@@ -95,7 +95,7 @@ cd SAT-nurse-scheduling
    python3 benchmark.py data/nurse7x3.json # macOS / Linux / iOS
    ```
 
-> 📝 Optional: Export the instance to DIMACS format  
+> Optional: Export the instance to DIMACS format  
 ```bash
 py dump_dimacs.py data/nurse7x3.json data/nurse7x3.cnf      # Windows  
 python3 dump_dimacs.py data/nurse7x3.json data/nurse7x3.cnf # macOS / Linux / iOS
