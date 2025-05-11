@@ -56,7 +56,7 @@ if __name__ == "__main__":
         ("DPLL",       dpll_sat),
         ("CDCL",       cdcl_sat),
     ]:
-        if name == "DP":
+        if name in {"DP", "Resolution"}:
             sat, timed_out = run_with_timeout(solver, (cnf,), timeout=2.0)
             if timed_out:
                 print(f"{name:>10}: Timeout (skipped)")
@@ -66,9 +66,16 @@ if __name__ == "__main__":
                 continue
         else:
             try:
-                sat = solver(cnf)
+                result = solver(cnf)
             except Exception as e:
                 print(f"{name:>10}: {type(e).__name__}")
                 continue
 
-        print(f"{name:>10}: {'SAT' if sat else 'UNSAT'}")
+            if isinstance(result, tuple):
+                sat, model = result
+            else:
+                sat, model = result, None
+
+            print(f"{name:>10}: {'SAT' if sat else 'UNSAT'}")
+            if sat and model is not None:
+                print(f"{name:>10} Model: {model}")
